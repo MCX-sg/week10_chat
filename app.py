@@ -4,7 +4,6 @@ import streamlit as st
 
 API_URL = "https://router.huggingface.co/v1/chat/completions"
 MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"
-TEST_MESSAGE = "Hello!"
 
 st.set_page_config(page_title="My AI Chat", layout="wide")
 
@@ -14,7 +13,7 @@ except Exception:
     hf_token = ""
 
 
-def request_hf_test_message(token: str) -> str:
+def request_hf_chat(token: str, messages: list[dict[str, str]]) -> str:
     response = requests.post(
         API_URL,
         headers={
@@ -23,7 +22,7 @@ def request_hf_test_message(token: str) -> str:
         },
         json={
             "model": MODEL_NAME,
-            "messages": [{"role": "user", "content": TEST_MESSAGE}],
+            "messages": messages,
             "max_tokens": 512,
         },
         timeout=60,
@@ -41,23 +40,44 @@ def request_hf_test_message(token: str) -> str:
     return data["choices"][0]["message"]["content"]
 
 
-st.title("My AI Chat")
-st.caption("Foundational Part A: send one hardcoded test message to the Hugging Face Inference Router.")
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-st.write(f"Test message: `{TEST_MESSAGE}`")
+
+st.title("My AI Chat")
+st.caption("Part B: multi-turn chat using native Streamlit chat components and full conversation history.")
+
 st.write(f"Model: `{MODEL_NAME}`")
 
 if not hf_token:
     st.error("Missing `HF_TOKEN` in Streamlit secrets. Add it in deployment settings or `.streamlit/secrets.toml`.")
 else:
-    try:
-        with st.spinner("Sending test message..."):
-            assistant_reply = request_hf_test_message(hf_token)
-        st.subheader("Model Response")
-        st.write(assistant_reply)
-    except ValueError as exc:
-        st.error(str(exc))
-    except requests.RequestException:
-        st.error("Network failure while contacting the Hugging Face API. Check your connection and try again.")
-    except Exception as exc:
-        st.error(f"Unexpected error: {exc}")
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    prompt = st.chat_input("Send a message")
+
+    if prompt:
+        user_message = {"role": "user", "content": prompt}
+        st.session_state.messages.append(user_message)
+
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            try:
+                with st.spinner("Thinking..."):
+                    assistant_reply = request_hf_chat(hf_token, st.session_state.messages)
+                st.markdown(assistant_reply)
+            except ValueError as exc:
+                assistant_reply = f"Error: {exc}"
+                st.error(str(exc))
+            except requests.RequestException:
+                assistant_reply = "Error: Network failure while contacting the Hugging Face API. Check your connection and try again."
+                st.error("Network failure while contacting the Hugging Face API. Check your connection and try again.")
+            except Exception as exc:
+                assistant_reply = f"Error: Unexpected error: {exc}"
+                st.error(f"Unexpected error: {exc}")
+
+        st.session_state.messages.append({"role": "assistant", "content": assistant_reply})
