@@ -1,3 +1,6 @@
+from datetime import datetime
+from uuid import uuid4
+
 import requests
 import streamlit as st
 
@@ -40,44 +43,129 @@ def request_hf_chat(token: str, messages: list[dict[str, str]]) -> str:
     return data["choices"][0]["message"]["content"]
 
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+def make_chat(title: str = "New Chat") -> dict:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return {
+        "id": uuid4().hex,
+        "title": title,
+        "timestamp": timestamp,
+        "messages": [],
+    }
+
+
+def ensure_chat_state() -> None:
+    if "chats" not in st.session_state:
+        first_chat = make_chat()
+        st.session_state.chats = [first_chat]
+        st.session_state.active_chat_id = first_chat["id"]
+    elif "active_chat_id" not in st.session_state:
+        st.session_state.active_chat_id = st.session_state.chats[0]["id"] if st.session_state.chats else None
+
+
+def get_active_chat() -> dict | None:
+    active_chat_id = st.session_state.active_chat_id
+    for chat in st.session_state.chats:
+        if chat["id"] == active_chat_id:
+            return chat
+    return None
+
+
+def create_new_chat() -> None:
+    new_chat = make_chat()
+    st.session_state.chats.insert(0, new_chat)
+    st.session_state.active_chat_id = new_chat["id"]
+
+
+def delete_chat(chat_id: str) -> None:
+    chats = st.session_state.chats
+    remaining = [chat for chat in chats if chat["id"] != chat_id]
+    st.session_state.chats = remaining
+
+    if not remaining:
+        st.session_state.active_chat_id = None
+        return
+
+    if st.session_state.active_chat_id == chat_id:
+        st.session_state.active_chat_id = remaining[0]["id"]
+
+
+def update_chat_title(chat: dict) -> None:
+    if chat["messages"] and chat["title"] == "New Chat":
+        first_user_message = next(
+            (message["content"] for message in chat["messages"] if message["role"] == "user"),
+            "New Chat",
+        )
+        chat["title"] = first_user_message[:30] or "New Chat"
+
+
+ensure_chat_state()
+active_chat = get_active_chat()
 
 
 st.title("My AI Chat")
-st.caption("Part B: multi-turn chat using native Streamlit chat components and full conversation history.")
+st.caption("Part C: multi-chat sidebar navigation with native Streamlit chat components.")
 
 st.write(f"Model: `{MODEL_NAME}`")
+
+with st.sidebar:
+    st.header("Chats")
+    st.button("New Chat", on_click=create_new_chat, use_container_width=True)
+
+    if st.session_state.chats:
+        for chat in st.session_state.chats:
+            is_active = chat["id"] == st.session_state.active_chat_id
+            row_left, row_right = st.columns([5, 1])
+
+            with row_left:
+                label = f"{chat['title']}\n{chat['timestamp']}"
+                if st.button(
+                    label,
+                    key=f"chat_select_{chat['id']}",
+                    use_container_width=True,
+                    type="primary" if is_active else "secondary",
+                ):
+                    st.session_state.active_chat_id = chat["id"]
+
+            with row_right:
+                if st.button("✕", key=f"chat_delete_{chat['id']}", use_container_width=True):
+                    delete_chat(chat["id"])
+                    st.rerun()
+    else:
+        st.info("No chats yet. Create one to get started.")
 
 if not hf_token:
     st.error("Missing `HF_TOKEN` in Streamlit secrets. Add it in deployment settings or `.streamlit/secrets.toml`.")
 else:
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    if active_chat is None:
+        st.info("No active chat selected. Create a new chat from the sidebar.")
+    else:
+        for message in active_chat["messages"]:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-    prompt = st.chat_input("Send a message")
+        prompt = st.chat_input("Send a message")
 
-    if prompt:
-        user_message = {"role": "user", "content": prompt}
-        st.session_state.messages.append(user_message)
+        if prompt:
+            user_message = {"role": "user", "content": prompt}
+            active_chat["messages"].append(user_message)
+            update_chat_title(active_chat)
 
-        with st.chat_message("user"):
-            st.markdown(prompt)
+            with st.chat_message("user"):
+                st.markdown(prompt)
 
-        with st.chat_message("assistant"):
-            try:
-                with st.spinner("Thinking..."):
-                    assistant_reply = request_hf_chat(hf_token, st.session_state.messages)
-                st.markdown(assistant_reply)
-            except ValueError as exc:
-                assistant_reply = f"Error: {exc}"
-                st.error(str(exc))
-            except requests.RequestException:
-                assistant_reply = "Error: Network failure while contacting the Hugging Face API. Check your connection and try again."
-                st.error("Network failure while contacting the Hugging Face API. Check your connection and try again.")
-            except Exception as exc:
-                assistant_reply = f"Error: Unexpected error: {exc}"
-                st.error(f"Unexpected error: {exc}")
+            with st.chat_message("assistant"):
+                try:
+                    with st.spinner("Thinking..."):
+                        assistant_reply = request_hf_chat(hf_token, active_chat["messages"])
+                    st.markdown(assistant_reply)
+                except ValueError as exc:
+                    assistant_reply = f"Error: {exc}"
+                    st.error(str(exc))
+                except requests.RequestException:
+                    assistant_reply = "Error: Network failure while contacting the Hugging Face API. Check your connection and try again."
+                    st.error("Network failure while contacting the Hugging Face API. Check your connection and try again.")
+                except Exception as exc:
+                    assistant_reply = f"Error: Unexpected error: {exc}"
+                    st.error(f"Unexpected error: {exc}")
 
-        st.session_state.messages.append({"role": "assistant", "content": assistant_reply})
+            active_chat["messages"].append({"role": "assistant", "content": assistant_reply})

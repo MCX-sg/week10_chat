@@ -28,16 +28,30 @@ AI extended the current Part A app into Part Bnow with real chat input, native s
 It got the current Part A baseline and  Part B rubric in front. It replaced the one-shot test flow with a proper multi-turn chat while keeping the same Hugging Face router integration and graceful error handling.
 Commit
 **My Modifications & Reflections:** 
+After commiting and pushing part B to Github, I can send messages and interact with the app I deployed. I sent some messages to test the app, and it remembered previous information I told it after a few lines of interactions. Successful.
 
+### Task: Core Chat Application
+Chat Management
+**Prompt:** 
+Now we move to part C of the task. We should add a New Chat button to the sidebar that creates a fresh, empty conversation and adds it to the sidebar chat list.
+Use the native Streamlit sidebar (st.sidebar) for chat navigation.
+The sidebar shows a scrollable list of all current chats, each displaying a title and timestamp.
+The currently active chat must be visually highlighted in the sidebar.
+Clicking a chat in the sidebar switches to it without deleting or overwriting any other chats.
+Each chat entry must have a ✕ delete button. Clicking it removes the chat from the list. If the deleted chat was active, the app must switch to another chat or show an empty state.
+**AI Suggestion:** 
+AI specifically made sure part A and B are not scratched, which is good.
+It got the Part C rubric and the current Part B app lined up. It also reconstructed session state to manage multiple chats in the sidebar while preserving the existing chat request flow.
+**My Modifications & Reflections:**
+After commit and push.
 
-Extend Part A to replace the hardcoded test message with a real input interface.
-Use native Streamlit chat UI elements. Render messages with st.chat_message(...) and collect user input with st.chat_input(...).
-Add a fixed input bar at the bottom of the main area.
-Store the full conversation history in st.session_state. After each exchange, append both the user message and the assistant response to the history.
-Send the full message history with each API request so the model maintains context.
-Render the conversation history above the input bar using default Streamlit UI elements rather than CSS-based custom chat bubbles.
-The message history must scroll independently of the input bar — the input bar stays visible at all times.
-Success criteria (Part B): Sending multiple messages in a row produces context-aware replies (e.g. the model remembers the user’s name from an earlier message). Messages are displayed with correct styling and the input bar remains fixed.
+Add a New Chat button to the sidebar that creates a fresh, empty conversation and adds it to the sidebar chat list.
+Use the native Streamlit sidebar (st.sidebar) for chat navigation.
+The sidebar shows a scrollable list of all current chats, each displaying a title and timestamp.
+The currently active chat must be visually highlighted in the sidebar.
+Clicking a chat in the sidebar switches to it without deleting or overwriting any other chats.
+Each chat entry must have a ✕ delete button. Clicking it removes the chat from the list. If the deleted chat was active, the app must switch to another chat or show an empty state.
+Success criteria (Part C): Multiple chats can be created, switched between, and deleted independently. The active chat is always visually distinct.
 
 
 
