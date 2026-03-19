@@ -59,7 +59,8 @@ A generated or summarized chat title is acceptable and encouraged. The title doe
 AI confirmed there’s no real persistence yet, just .gitkeep in chats/. AI wired in JSON-backed load/save/delete behavior now so the sidebar state is restored from disk on startup
 It also verified the updated file parses cleanly. It also tested the persistence behavior next or commit and push this Part D change.
 **My Modifications & Reflections:** 
-
+I noticed that when I open the app for the first time, a chat is already created. If i delete the chat, it shows "No active chat selected. Create a new chat from the sidebar".I want this app to start in an empty state instead of auto-creating a chat. Therefore I asked AI to fix this in the .py file. Not quite related to the task.
+Reloading the app preserves the previous chats. Task is successful. 
 
 Success criteria (Part D): Closing and reopening the app shows all previous chats intact in the sidebar. Continuing a loaded chat works correctly. Deleting a chat removes its file from disk.
 

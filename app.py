@@ -116,10 +116,8 @@ def ensure_chat_state() -> None:
             st.session_state.chats = loaded_chats
             st.session_state.active_chat_id = loaded_chats[0]["id"]
         else:
-            first_chat = make_chat()
-            save_chat(first_chat)
-            st.session_state.chats = [first_chat]
-            st.session_state.active_chat_id = first_chat["id"]
+            st.session_state.chats = []
+            st.session_state.active_chat_id = None
     elif "active_chat_id" not in st.session_state:
         st.session_state.active_chat_id = st.session_state.chats[0]["id"] if st.session_state.chats else None
 
