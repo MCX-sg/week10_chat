@@ -297,7 +297,7 @@ memory = load_memory()
 
 
 st.title("My AI Chat")
-st.caption("Part C: multi-chat sidebar navigation with native Streamlit chat components.")
+st.caption("Final app: multi-chat AI assistant with persistence, streaming, and personalized user memory.")
 
 st.write(f"Model: `{MODEL_NAME}`")
 
