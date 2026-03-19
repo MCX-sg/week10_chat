@@ -99,3 +99,4 @@ Hint: A simple memory extraction prompt might look like: “Given this user mess
 After receiving the final requirements, AI added a small persistent memory store plus a second lightweight extraction call after each turn; it then surfaced that memory in the sidebar and allowed it to feed it back into future prompts.
 **My Modifications & Reflections:** 
 AI verified the program with an isolated automated test harness using a fake requests module, not against the live Hugging Face service. That means the app logic is behaving correctly, but live-model extraction quality can still vary a bit.
+After pushing, and testing the app, it is clear that the chatbox can remember personal traits and display it correctly on the side bar. 
