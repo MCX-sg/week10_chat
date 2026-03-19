@@ -62,10 +62,31 @@ It also verified the updated file parses cleanly. It also tested the persistence
 I noticed that when I open the app for the first time, a chat is already created. If i delete the chat, it shows "No active chat selected. Create a new chat from the sidebar".I want this app to start in an empty state instead of auto-creating a chat. Therefore I asked AI to fix this in the .py file. Not quite related to the task.
 Reloading the app preserves the previous chats. Task is successful. 
 
-Success criteria (Part D): Closing and reopening the app shows all previous chats intact in the sidebar. Continuing a loaded chat works correctly. Deleting a chat removes its file from disk.
+### Task:  Response Streaming 
+Display the model’s reply token-by-token as it is generated instead of waiting for the full response.
+**Prompt:** 
+This is a new task. After this task, we should:Display the model’s reply token-by-token as it is generated instead of waiting for the full response.
+Use the stream=True parameter in your API request and handle the server-sent event stream.
+In Streamlit, use native Streamlit methods such as st.write_stream() or manually update a placeholder with st.empty() as chunks arrive.
+The full streamed response must be saved to the chat history once streaming is complete.
+Hint: Add stream=True to your request payload and set stream=True on the requests.post() call. The response body will be a series of data: lines in SSE format.
+
+Note: Very small models such as meta-llama/Llama-3.2-1B-Instruct may stream so quickly that the output appears to arrive all at once. If your app is correctly receiving multiple streamed chunks but the effect is too fast to notice, you are required to add a very short delay between rendering chunks so the streaming behavior is visible in the UI.
+**AI Suggestion:** 
+AI made changes so the program now streams assistant replies incrementally.
+What changed:
+the API request now sends "stream": True
+requests.post(..., stream=True) is used
+the app parses SSE data: lines from the response
+chunks are rendered with st.write_stream(...)
+a short time.sleep(0.02) delay is added so the streaming effect is visible
+the full returned text is still saved to the chat history after streaming finishes
+AI also verified the updated file parses cleanly.
+**My Modifications & Reflections:** 
 
 
 
+Success criteria: Responses appear incrementally in the chat interface and are correctly saved to history.
 
 ### Task: 
 **Prompt:** 

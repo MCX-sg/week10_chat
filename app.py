@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
@@ -22,30 +23,56 @@ except Exception:
 
 
 def request_hf_chat(token: str, messages: list[dict[str, str]]) -> str:
-    response = requests.post(
-        API_URL,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": MODEL_NAME,
-            "messages": messages,
-            "max_tokens": 512,
-        },
-        timeout=60,
-    )
+    def stream_chunks():
+        with requests.post(
+            API_URL,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": MODEL_NAME,
+                "messages": messages,
+                "max_tokens": 512,
+                "stream": True,
+            },
+            timeout=60,
+            stream=True,
+        ) as response:
+            if response.status_code == 401:
+                raise ValueError("Invalid Hugging Face token. Check your `HF_TOKEN` secret and try again.")
+            if response.status_code == 429:
+                raise ValueError("Rate limit reached. Wait a moment and try again.")
+            if response.status_code >= 400:
+                detail = response.text.strip() or f"HTTP {response.status_code}"
+                raise ValueError(f"Hugging Face API error: {detail}")
 
-    if response.status_code == 401:
-        raise ValueError("Invalid Hugging Face token. Check your `HF_TOKEN` secret and try again.")
-    if response.status_code == 429:
-        raise ValueError("Rate limit reached. Wait a moment and try again.")
-    if response.status_code >= 400:
-        detail = response.text.strip() or f"HTTP {response.status_code}"
-        raise ValueError(f"Hugging Face API error: {detail}")
+            for raw_line in response.iter_lines(decode_unicode=True):
+                if not raw_line:
+                    continue
+                if not raw_line.startswith("data:"):
+                    continue
 
-    data = response.json()
-    return data["choices"][0]["message"]["content"]
+                data_str = raw_line[len("data:") :].strip()
+                if data_str == "[DONE]":
+                    break
+
+                try:
+                    event = json.loads(data_str)
+                except json.JSONDecodeError:
+                    continue
+
+                choices = event.get("choices", [])
+                if not choices:
+                    continue
+
+                delta = choices[0].get("delta", {})
+                content = delta.get("content", "")
+                if content:
+                    yield content
+                    time.sleep(0.02)
+
+    return st.write_stream(stream_chunks())
 
 
 def make_chat(title: str = "New Chat") -> dict:
@@ -228,9 +255,7 @@ else:
 
             with st.chat_message("assistant"):
                 try:
-                    with st.spinner("Thinking..."):
-                        assistant_reply = request_hf_chat(hf_token, active_chat["messages"])
-                    st.markdown(assistant_reply)
+                    assistant_reply = request_hf_chat(hf_token, active_chat["messages"])
                 except ValueError as exc:
                     assistant_reply = f"Error: {exc}"
                     st.error(str(exc))
