@@ -1,4 +1,8 @@
+from __future__ import annotations
+
+import json
 from datetime import datetime
+from pathlib import Path
 from uuid import uuid4
 
 import requests
@@ -7,6 +11,7 @@ import streamlit as st
 
 API_URL = "https://router.huggingface.co/v1/chat/completions"
 MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"
+CHATS_DIR = Path(__file__).parent / "chats"
 
 st.set_page_config(page_title="My AI Chat", layout="wide")
 
@@ -53,11 +58,68 @@ def make_chat(title: str = "New Chat") -> dict:
     }
 
 
+def chat_file_path(chat_id: str) -> Path:
+    return CHATS_DIR / f"{chat_id}.json"
+
+
+def save_chat(chat: dict) -> None:
+    CHATS_DIR.mkdir(exist_ok=True)
+    payload = {
+        "id": chat["id"],
+        "title": chat["title"],
+        "timestamp": chat["timestamp"],
+        "messages": chat["messages"],
+    }
+    chat_file_path(chat["id"]).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def load_chats() -> list[dict]:
+    CHATS_DIR.mkdir(exist_ok=True)
+    loaded_chats = []
+
+    for path in sorted(CHATS_DIR.glob("*.json")):
+        try:
+            chat = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+
+        if not isinstance(chat, dict):
+            continue
+
+        chat_id = str(chat.get("id", "")).strip() or path.stem
+        title = str(chat.get("title", "")).strip() or "New Chat"
+        timestamp = str(chat.get("timestamp", "")).strip() or datetime.fromtimestamp(path.stat().st_mtime).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        messages = chat.get("messages", [])
+
+        if not isinstance(messages, list):
+            messages = []
+
+        loaded_chats.append(
+            {
+                "id": chat_id,
+                "title": title,
+                "timestamp": timestamp,
+                "messages": messages,
+            }
+        )
+
+    loaded_chats.sort(key=lambda chat: chat["timestamp"], reverse=True)
+    return loaded_chats
+
+
 def ensure_chat_state() -> None:
     if "chats" not in st.session_state:
-        first_chat = make_chat()
-        st.session_state.chats = [first_chat]
-        st.session_state.active_chat_id = first_chat["id"]
+        loaded_chats = load_chats()
+        if loaded_chats:
+            st.session_state.chats = loaded_chats
+            st.session_state.active_chat_id = loaded_chats[0]["id"]
+        else:
+            first_chat = make_chat()
+            save_chat(first_chat)
+            st.session_state.chats = [first_chat]
+            st.session_state.active_chat_id = first_chat["id"]
     elif "active_chat_id" not in st.session_state:
         st.session_state.active_chat_id = st.session_state.chats[0]["id"] if st.session_state.chats else None
 
@@ -74,12 +136,16 @@ def create_new_chat() -> None:
     new_chat = make_chat()
     st.session_state.chats.insert(0, new_chat)
     st.session_state.active_chat_id = new_chat["id"]
+    save_chat(new_chat)
 
 
 def delete_chat(chat_id: str) -> None:
     chats = st.session_state.chats
     remaining = [chat for chat in chats if chat["id"] != chat_id]
     st.session_state.chats = remaining
+    chat_path = chat_file_path(chat_id)
+    if chat_path.exists():
+        chat_path.unlink()
 
     if not remaining:
         st.session_state.active_chat_id = None
@@ -96,6 +162,10 @@ def update_chat_title(chat: dict) -> None:
             "New Chat",
         )
         chat["title"] = first_user_message[:30] or "New Chat"
+
+
+def touch_chat(chat: dict) -> None:
+    chat["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 ensure_chat_state()
@@ -152,6 +222,8 @@ else:
             user_message = {"role": "user", "content": prompt}
             active_chat["messages"].append(user_message)
             update_chat_title(active_chat)
+            touch_chat(active_chat)
+            save_chat(active_chat)
 
             with st.chat_message("user"):
                 st.markdown(prompt)
@@ -172,3 +244,4 @@ else:
                     st.error(f"Unexpected error: {exc}")
 
             active_chat["messages"].append({"role": "assistant", "content": assistant_reply})
+            save_chat(active_chat)

@@ -46,13 +46,23 @@ It got the Part C rubric and the current Part B app lined up. It also reconstruc
 After commit and push.
 The side bar was addded successfully, and I can start new chats while remaining old chat content. it is worth noting that I can only enter the other chat by double clicking. I deicde to fix this. I think this is because the first click is likely only causing a rerun/state transition, and the second click is the one that lands on the target chat. Codex patched this fairly straightforward.
 
-Add a New Chat button to the sidebar that creates a fresh, empty conversation and adds it to the sidebar chat list.
-Use the native Streamlit sidebar (st.sidebar) for chat navigation.
-The sidebar shows a scrollable list of all current chats, each displaying a title and timestamp.
-The currently active chat must be visually highlighted in the sidebar.
-Clicking a chat in the sidebar switches to it without deleting or overwriting any other chats.
-Each chat entry must have a ✕ delete button. Clicking it removes the chat from the list. If the deleted chat was active, the app must switch to another chat or show an empty state.
-Success criteria (Part C): Multiple chats can be created, switched between, and deleted independently. The active chat is always visually distinct.
+### Task: Core Chat Application
+Chat Persistence
+**Prompt:** 
+We will now work on chat persistence.
+Each chat session is saved as a separate JSON file inside a chats/ directory. Each file must store at minimum: a chat ID, a title or timestamp, and the full message history.
+On app startup, all existing files in chats/ are loaded and shown in the sidebar automatically.
+Returning to a previous chat and continuing the conversation must work correctly.
+Deleting a chat (✕ button) must also delete the corresponding JSON file from chats/.
+A generated or summarized chat title is acceptable and encouraged. The title does not need to be identical to the first user message.
+**AI Suggestion:** 
+AI confirmed there’s no real persistence yet, just .gitkeep in chats/. AI wired in JSON-backed load/save/delete behavior now so the sidebar state is restored from disk on startup
+It also verified the updated file parses cleanly. It also tested the persistence behavior next or commit and push this Part D change.
+**My Modifications & Reflections:** 
+
+
+Success criteria (Part D): Closing and reopening the app shows all previous chats intact in the sidebar. Continuing a loaded chat works correctly. Deleting a chat removes its file from disk.
+
 
 
 
