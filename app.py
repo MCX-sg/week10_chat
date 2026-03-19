@@ -125,6 +125,7 @@ with st.sidebar:
                     type="primary" if is_active else "secondary",
                 ):
                     st.session_state.active_chat_id = chat["id"]
+                    st.rerun()
 
             with row_right:
                 if st.button("✕", key=f"chat_delete_{chat['id']}", use_container_width=True):
@@ -132,6 +133,8 @@ with st.sidebar:
                     st.rerun()
     else:
         st.info("No chats yet. Create one to get started.")
+
+active_chat = get_active_chat()
 
 if not hf_token:
     st.error("Missing `HF_TOKEN` in Streamlit secrets. Add it in deployment settings or `.streamlit/secrets.toml`.")

@@ -44,6 +44,7 @@ AI specifically made sure part A and B are not scratched, which is good.
 It got the Part C rubric and the current Part B app lined up. It also reconstructed session state to manage multiple chats in the sidebar while preserving the existing chat request flow.
 **My Modifications & Reflections:**
 After commit and push.
+The side bar was addded successfully, and I can start new chats while remaining old chat content. it is worth noting that I can only enter the other chat by double clicking. I deicde to fix this. I think this is because the first click is likely only causing a rerun/state transition, and the second click is the one that lands on the target chat. Codex patched this fairly straightforward.
 
 Add a New Chat button to the sidebar that creates a fresh, empty conversation and adds it to the sidebar chat list.
 Use the native Streamlit sidebar (st.sidebar) for chat navigation.
