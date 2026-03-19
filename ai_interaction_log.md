@@ -70,7 +70,6 @@ Use the stream=True parameter in your API request and handle the server-sent eve
 In Streamlit, use native Streamlit methods such as st.write_stream() or manually update a placeholder with st.empty() as chunks arrive.
 The full streamed response must be saved to the chat history once streaming is complete.
 Hint: Add stream=True to your request payload and set stream=True on the requests.post() call. The response body will be a series of data: lines in SSE format.
-
 Note: Very small models such as meta-llama/Llama-3.2-1B-Instruct may stream so quickly that the output appears to arrive all at once. If your app is correctly receiving multiple streamed chunks but the effect is too fast to notice, you are required to add a very short delay between rendering chunks so the streaming behavior is visible in the UI.
 **AI Suggestion:** 
 AI made changes so the program now streams assistant replies incrementally.
@@ -83,12 +82,20 @@ a short time.sleep(0.02) delay is added so the streaming effect is visible
 the full returned text is still saved to the chat history after streaming finishes
 AI also verified the updated file parses cleanly.
 **My Modifications & Reflections:** 
+After commiting and pushing the changes to GitHub, I tested the app. The responses appear incrementally, which indicates that the program is successful. All chats are saved to history correctly as well.
 
-
-
-Success criteria: Responses appear incrementally in the chat interface and are correctly saved to history.
-
-### Task: 
+### Task: User Memory
+Extract and store user preferences from conversations, then use them to personalize future responses.
 **Prompt:** 
+Now it is time for the final task. After this, the app should be able to extract and store user preferences from conversations, then use them to personalize future responses.
+After each assistant response, make a second lightweight API call asking the model to extract any personal traits or preferences mentioned by the user in that message.
+Extracted traits are stored in a memory.json file. Example categories might include name, preferred language, interests, communication style, favorite topics, or other useful personal preferences.
+The sidebar displays a User Memory expander panel showing the currently stored traits.
+Include a native Streamlit control to clear/reset the saved memory.
+Stored memory is injected into the system prompt of future conversations so the model can personalize responses.
+Implementation note: The categories above are only examples for reference. It is up to you to decide what traits to store, how to structure your memory.json, how to merge or update existing memory, and how to incorporate that memory into future prompts, as long as the final app clearly demonstrates persistent user memory and personalization.
+Hint: A simple memory extraction prompt might look like: “Given this user message, extract any personal facts or preferences as a JSON object. If none, return {}”
 **AI Suggestion:** 
+After receiving the final requirements, AI added a small persistent memory store plus a second lightweight extraction call after each turn; it then surfaced that memory in the sidebar and allowed it to feed it back into future prompts.
 **My Modifications & Reflections:** 
+AI verified the program with an isolated automated test harness using a fake requests module, not against the live Hugging Face service. That means the app logic is behaving correctly, but live-model extraction quality can still vary a bit.

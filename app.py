@@ -13,6 +13,7 @@ import streamlit as st
 API_URL = "https://router.huggingface.co/v1/chat/completions"
 MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"
 CHATS_DIR = Path(__file__).parent / "chats"
+MEMORY_PATH = Path(__file__).parent / "memory.json"
 
 st.set_page_config(page_title="My AI Chat", layout="wide")
 
@@ -22,7 +23,57 @@ except Exception:
     hf_token = ""
 
 
-def request_hf_chat(token: str, messages: list[dict[str, str]]) -> str:
+def load_memory() -> dict:
+    if not MEMORY_PATH.exists():
+        return {}
+
+    raw = MEMORY_PATH.read_text(encoding="utf-8").strip()
+    if not raw:
+        return {}
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+
+    return data if isinstance(data, dict) else {}
+
+
+def save_memory(memory: dict) -> None:
+    MEMORY_PATH.write_text(json.dumps(memory, indent=2), encoding="utf-8")
+
+
+def clear_memory() -> None:
+    save_memory({})
+
+
+def merge_memory(existing: dict, updates: dict) -> dict:
+    merged = dict(existing)
+    for key, value in updates.items():
+        normalized_key = str(key).strip()
+        if not normalized_key or value in ("", None, [], {}):
+            continue
+        merged[normalized_key] = value
+    return merged
+
+
+def build_model_messages(messages: list[dict[str, str]], memory: dict) -> list[dict[str, str]]:
+    if not memory:
+        return messages
+
+    memory_lines = []
+    for key, value in memory.items():
+        memory_lines.append(f"- {key}: {value}")
+
+    system_message = {
+        "role": "system",
+        "content": "Use the following saved user memory to personalize responses when relevant:\n"
+        + "\n".join(memory_lines),
+    }
+    return [system_message, *messages]
+
+
+def request_hf_chat(token: str, messages: list[dict[str, str]], memory: dict) -> str:
     def stream_chunks():
         with requests.post(
             API_URL,
@@ -32,7 +83,7 @@ def request_hf_chat(token: str, messages: list[dict[str, str]]) -> str:
             },
             json={
                 "model": MODEL_NAME,
-                "messages": messages,
+                "messages": build_model_messages(messages, memory),
                 "max_tokens": 512,
                 "stream": True,
             },
@@ -73,6 +124,53 @@ def request_hf_chat(token: str, messages: list[dict[str, str]]) -> str:
                     time.sleep(0.02)
 
     return st.write_stream(stream_chunks())
+
+
+def extract_user_memory(token: str, user_message: str) -> dict:
+    response = requests.post(
+        API_URL,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": MODEL_NAME,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Given this user message, extract any personal facts or preferences as a JSON object. "
+                        "Use short keys like name, preferred_language, interests, communication_style, favorite_topics. "
+                        "If there are no personal facts or preferences, return {}. Return JSON only."
+                    ),
+                },
+                {"role": "user", "content": user_message},
+            ],
+            "max_tokens": 180,
+        },
+        timeout=60,
+    )
+
+    if response.status_code >= 400:
+        return {}
+
+    try:
+        data = response.json()
+        content = data["choices"][0]["message"]["content"].strip()
+    except (KeyError, IndexError, json.JSONDecodeError, TypeError):
+        return {}
+
+    if content.startswith("```"):
+        content = content.strip("`")
+        if content.startswith("json"):
+            content = content[4:].strip()
+
+    try:
+        extracted = json.loads(content)
+    except json.JSONDecodeError:
+        return {}
+
+    return extracted if isinstance(extracted, dict) else {}
 
 
 def make_chat(title: str = "New Chat") -> dict:
@@ -195,6 +293,7 @@ def touch_chat(chat: dict) -> None:
 
 ensure_chat_state()
 active_chat = get_active_chat()
+memory = load_memory()
 
 
 st.title("My AI Chat")
@@ -205,6 +304,14 @@ st.write(f"Model: `{MODEL_NAME}`")
 with st.sidebar:
     st.header("Chats")
     st.button("New Chat", on_click=create_new_chat, use_container_width=True)
+    with st.expander("User Memory", expanded=True):
+        if memory:
+            st.json(memory)
+        else:
+            st.caption("No saved memory yet.")
+        if st.button("Clear Memory", use_container_width=True):
+            clear_memory()
+            st.rerun()
 
     if st.session_state.chats:
         for chat in st.session_state.chats:
@@ -255,7 +362,7 @@ else:
 
             with st.chat_message("assistant"):
                 try:
-                    assistant_reply = request_hf_chat(hf_token, active_chat["messages"])
+                    assistant_reply = request_hf_chat(hf_token, active_chat["messages"], memory)
                 except ValueError as exc:
                     assistant_reply = f"Error: {exc}"
                     st.error(str(exc))
@@ -268,3 +375,12 @@ else:
 
             active_chat["messages"].append({"role": "assistant", "content": assistant_reply})
             save_chat(active_chat)
+
+            if not assistant_reply.startswith("Error:"):
+                try:
+                    extracted_memory = extract_user_memory(hf_token, prompt)
+                    updated_memory = merge_memory(memory, extracted_memory)
+                    if updated_memory != memory:
+                        save_memory(updated_memory)
+                except requests.RequestException:
+                    pass
